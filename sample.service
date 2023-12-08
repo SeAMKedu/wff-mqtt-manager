@@ -1,0 +1,11 @@
+[Unit]
+Description=MQTT listener for FoodLab sensor messages
+After=mosquitto.service influxdb.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/user/installation/path
+ExecStart=./venv/bin/python mqtt2influx.py sample.ini
+
+[Install]
+WantedBy=multi-user.target
