@@ -2,28 +2,52 @@ from influxdb_client import Point
 from ruuvi_decoders import Df5Decoder, Df3Decoder
 import datetime
 import json
-from ..handler import Handler
+import re
+from handler import Handler, Database
+
 
 class RuuviHandler(Handler):
+    _name = "RuuviGateway message handler"
+    _config_section = "RUUVIGATEWAY"
+    _config_allowed_macs = "RUUVIGATEWAY.ALLOWED_MACS"
+    _macs_tracked = 20
 
 
     def __init__(self, config) -> None:
-        self.SEEN_UUIDS = []
+        self.SEEN_MACS = []
+        self._bucket = config[RuuviHandler._config_section]["Bucket"]
+        self.topic = config[RuuviHandler._config_section]["Topic"]
+        self.short_topic = self.topic[:-1] if self.topic.endswith("#") else self.topic
+        self.allowed_ruuvitags = []
+        for key, value in config.items(RuuviHandler._config_allowed_macs):
+            self.allowed_ruuvitags.append(re.findall('"([^"]*)"', value)[0])
+        if __debug__: print(f"Allowed tags: {self.allowed_ruuvitags}")
 
 
+    @staticmethod
     def getName():
-        return "RuuviGateway handler"
+        return RuuviHandler._name
 
 
+    @staticmethod
     def getConfigSection():
-        return "RUUVIGATEWAY"
+        return RuuviHandler._config_section
+
+
+    @staticmethod
+    def getDatabase() -> Database:
+        return Database.INFLUXDB
+
+
+    def getBucket(self):
+        return self._bucket
 
 
     def handleMessage(self, msg):
         data_point = None
 
         payload = json.loads(msg.payload)
-        #print(payload)
+
         if payload.get("data") is not None:
             raw_data = payload.get("data")
 
@@ -34,6 +58,7 @@ class RuuviHandler(Handler):
 
         return data_point
 
+    
     def parseRuuviTag(self, payload):
         clean_data = payload.get("data").split("FF9904")[1]
 
@@ -46,7 +71,9 @@ class RuuviHandler(Handler):
             decoder = Df5Decoder()
             data = decoder.decode_data(clean_data)
 
-        if not data["mac"] in allowed_ruuvitags:
+
+        if not data["mac"] in self.allowed_ruuvitags:
+            if __debug__: print("Mac not whitelisted")
             return None
 
         p = Point("ruuvi")
@@ -88,13 +115,12 @@ class RuuviHandler(Handler):
         uuid = data[0:32]
 
         if not uuid in colors.keys():
-            if uuid not in self.SEEN_UUIDS:
-                # track 20 latest unknown uuids to lessen number of log entries
-                self.SEEN_UUIDS.append(uuid)
-                if len(self.SEEN_UUIDS) > 20:
-                    self.SEEN_UUIDS.pop(0)
-                print(f"Unknown iBeacon uuid, {uuid}")
-                print(f"Data ({len(data)}): {data}")
+            if uuid not in self.MACS:
+                # track n latest unknown uuids to lessen number of log entries
+                self.MACS.append(uuid)
+                if len(self.SEEN_MACS) > RuuviHandler._macs_tracked:
+                    self.SEEN_MACS.pop(0)
+                if __debug__: print(f"Unknown iBeacon uuid, {uuid}\nData ({len(data)}): {data}")
             return
 
         # convert from hex strings to integers
@@ -103,9 +129,6 @@ class RuuviHandler(Handler):
         tx_power = int(data[40], 16)
         rssi = int(data[41], 16)
 
-        #print(f"Data ({len(data)}): {data}")
-        #print(f"{data[32:36]} -> {major}, {data[36:40]} -> {minor}, {data[40]} -> {tx_power}, {data[41]} -> {rssi}")
-        
         p = Point("tilt")
         p.tag("device", colors[uuid])
         p.field("temperature", (float(major) - 32) * 5/9)
@@ -115,7 +138,5 @@ class RuuviHandler(Handler):
 
         ts = datetime.datetime.utcfromtimestamp(int(payload.get("ts")))
         p.time(ts.isoformat())
-
-        #print(p)
 
         return p
