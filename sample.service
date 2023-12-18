@@ -5,7 +5,7 @@ After=mosquitto.service influxdb.service
 [Service]
 Type=simple
 WorkingDirectory=/home/user/installation/path
-ExecStart=./venv/bin/python mqtt2influx.py sample.ini
+ExecStart=./venv/bin/python wffmqttmanager.py sample.ini
 
 [Install]
 WantedBy=multi-user.target
