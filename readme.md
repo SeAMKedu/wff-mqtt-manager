@@ -2,6 +2,8 @@
 [epliitto_logo]:    /img/epliitto_logo.jpg
 [eakr_eu_logo]:     /img/eakr_eu_logo.jpg
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10682542.svg)](https://doi.org/10.5281/zenodo.10682542)
+
 # MQTT vastaanotin
 
 Tämä repository pitää sisällään Pythonilla kirjoitetun palvelun, mikä osaa ottaa vastaan MQTT viestejä, pääsääntöisesti eri IoT-lähteistä, ja tallentaa viestit sopivaan kantaan. Alunperin nämä olivat erillisiä scriptejä, tehty aina tarpeen mukaan, mutta tässä ne on refactoroitu yhden frameworkin alle, mahdollistaen suht helpon lisäyksen tuleville viesteille. 
